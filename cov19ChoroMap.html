@@ -1,0 +1,184 @@
+<!DOCTYPE html>
+<html>
+<head>
+	
+	<title>World Covid-19 Outlook</title>
+
+	<meta charset="utf-8" />
+	<meta name="viewport" content="width=device-width, initial-scale=1.0">
+	
+	<link rel="shortcut icon" type="image/x-icon" href="docs/images/favicon.ico" />
+
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.6.0/dist/leaflet.css" integrity="sha512-xwE/Az9zrjBIphAcBb3F6JVqxf46+CDLwfLMHloNu6KEQCAWi6HcDUbeOfBIptF7tcCzusKFjFw2yuvEpDL9wQ==" crossorigin=""/>
+    <script src="https://unpkg.com/leaflet@1.6.0/dist/leaflet.js" integrity="sha512-gZwIG9x3wUXg2hdXF6+rVkLF/0Vi9U8D2Ntg4Ga5I5BZpVkVxlJWbSQtXPSiUTtC0TjtGOmxa1AJPuV0CPthew==" crossorigin=""></script>
+
+	<style>
+		html, body {
+			height: 100%;
+			margin: 0;
+		}
+		#map {
+			width: 600px;
+			height: 400px;
+		}
+		p {
+			color:aqua
+		}
+		p1 {
+			color:darkblue
+		}
+		p2 {
+			color: cornflowerblue
+		}
+	</style>
+<!--styling of our map helps us to clearly see map feature. Height for instance, determines the content of the map that we can see. -->
+	<style>#map { width: 100%; height: 100%; }
+.info { padding: 6px 8px; font: 18px/24px Arial, Helvetica, sans-serif; background: rgba(127, 127, 127, 0.3); box-shadow: 0 0 15px rgba(0, 0, 0, 0.5); border-radius: 20px; } .info h4 { margin: 0 0 5px; color: #77ae47; }
+.legend { text-align: left; line-height: 18px; color: #f0e000; } .legend i { width: 18px; height: 18px; float: left; margin-right: 8px; opacity: 0.5; }</style>
+</head>
+<body>
+<!--This is the ID element that contains our map. This is the id we will use to reference our map. -->
+	
+<div id='map'></div>
+
+<!--This is where we will include GeoJSON file so that we be able to make use of map data in our web page-->
+
+<script type="text/javascript" src="worldBorders.json"></script>
+
+<script type="text/javascript">
+// Here is where we create our map by referencing the map id, and then set map view (coordinates and the zoom level),  and then assign it to map variable
+	var map = L.map('map').setView([0, 0], 2);
+
+	L.tileLayer('https://api.mapbox.com/styles/v1/{id}/tiles/{z}/{x}/{y}?access_token=pk.eyJ1IjoibWFwYm94IiwiYSI6ImNpejY4NXVycTA2emYycXBndHRqcmZ3N3gifQ.rJcFIG214AriISLbB6B5aw', {
+		maxZoom: 18,
+		attribution: 'Map data &copy; <a href="https://www.openstreetmap.org/">OpenStreetMap</a> contributors, ' +
+			'<a href="https://creativecommons.org/licenses/by-sa/2.0/">CC-BY-SA</a>, ' +
+			'Imagery © <a href="https://www.mapbox.com/">Mapbox</a>',
+		id: 'mapbox/light-v9',
+		tileSize: 512,
+		zoomOffset: -1
+	}).addTo(map);
+
+
+	// control that shows state info on hover. Alternatively, you can use the usual popups to show the same information about the states. 
+	var info = L.control();
+
+	info.onAdd = function (map) {
+		this._div = L.DomUtil.create('div', 'info'); // create a div with a class "info"
+		this.update();
+		return this._div;
+	};
+// Here, we use the update() method to update the control based on the feature properties passed
+	info.update = function (props) {
+		this._div.innerHTML = '<h4>Covid-19 Spread in the World by Country</h4>' +  (props ?
+			'<p><b>' + props.NAME + '</b><br><p1>' + props["covid19_WHO_data_Cumulative Confirmed"] + '</p1><p2>' + ' Cases have been Confirmed </p2>' + '<br><p1>' + props["covid19_WHO_data_Cumulative Deaths"] + '<p2> Deaths Recorded'
+			: 'Hover Mouse Over Each Country');
+	};
+
+	info.addTo(map);
+
+// We are going to color the states according to their population density. This is a technical thing to do, but there's a great tool that can help with it: ColorBrewer (you can find it here: https://colorbrewer2.org/#type=sequential&scheme=BuGn&n=3). Using the values we got from it, we create a function that returns a color based on population density:
+	function getColor(d) {
+		return d >= 900000 ? '#000000': 
+				d > 500000 ? '#33000f':
+				d > 250000 ? '#4c0016':
+				d > 100000 ? '#59001a':
+				d > 10000 ? '#66001e':
+				d > 1000 ? '#800026' :
+				d > 750  ? '#BD0026' :
+				d > 500  ? '#E31A1C' :
+				d > 250  ? '#FC4E2A' :
+				d > 100   ? '#FD8D3C' :
+				d > 50   ? '#FEB24C' :
+				d > 10   ? '#FED976' :
+							'#FFEDA0';
+	}
+// Then we will define a styling function for our GeoJSON layer so that its fillColor depends on feature.properties.density property, also adjusting the appearance a bit and adding a nice touch with dashed stroke.
+	function style(feature) {
+		return {
+			weight: 2,
+			opacity: 1,
+			color: 'white',
+			dashArray: '5',
+			fillOpacity: 0.7,
+			fillColor: getColor(feature.properties["covid19_WHO_data_Cumulative Confirmed"])
+		};
+	}
+
+//Now let's define an event listner for layer mouseover event. This will make the states highlighted visually in some way when they are hovered with a mouse. 
+	
+	function highlightFeature(e) {
+		var layer = e.target;
+
+		layer.setStyle({
+			weight: 5,
+			color: '#033a23',
+			dashArray: '',
+			fillOpacity: 0.7
+		});
+//Here we get access to the layer that was hovered through `e.target`, set a thick grey border on the layer as our highlight effect, also bringing it to the front so that the border doesn't clash with nearby states (but not for IE, Opera or Edge, since they have problems doing `bringToFront` on `mouseover`).
+
+		if (!L.Browser.ie && !L.Browser.opera && !L.Browser.edge) {
+			layer.bringToFront();
+		}
+
+		info.update(layer.feature.properties);
+	}
+//This creates a GeoJSON variable before our event listners without assigning anything to it. Note that GeoJSON works this way too, and then data can later be assigned to it. 
+	var geojson;
+
+//We call the function resetHighlight() and use the geojson.resetStyle() method to reset the layer style to its default state (defined by our style function). And then return the updated state info using the info.update() method. In order for the geojson.resetStyle() method to work, make sure our GeoJSON layer is accessible through the geojson variable by defining it before our listeners and assigning the layer to it later. 
+	
+	function resetHighlight(e) {
+		geojson.resetStyle(e.target);
+		info.update();
+	}
+//Call a click listner (zoomToFeature()) that zooms to the states and adjusts the map view to the geographical bounds visible in the current map view
+	function zoomToFeature(e) {
+		map.fitBounds(e.target.getBounds()); //Adjust zoom level of map, in this case, to the level of the current map
+	}
+//Now we’ll use the onEachFeature option to add the listeners on our state layers
+	function onEachFeature(feature, layer) {
+		layer.on({
+			mouseover: highlightFeature,
+			mouseout: resetHighlight,
+			click: zoomToFeature
+		});
+	}
+//At this stage, we can create the json layer (the assigned value) for the "var geojson" variable which we established above. Here, the variable, statesData, in the "us-states.js" included in the script above, is parse with the options such as style and onEachFeature and then the geojson layer is added to the map.    
+	geojson = L.geoJson(coVid19USAStates, {
+		style: style,
+		onEachFeature: onEachFeature
+	}).addTo(map);
+//Add element to the tile attribution
+	map.attributionControl.addAttribution('Covid-19 USA data & copy; <a href="https://github.com/CSSEGISandData/COVID-19/tree/master/archived_data">JOHN HOPKINS CSSEGISandData</a>');
+
+//Cretes the legend of the choropleth map. Creating a control with a legend is easier, since it is static and doesn’t change on state hover.  
+	var legend = L.control({position: 'bottomleft'});
+
+	legend.onAdd = function (map) {
+
+		var div = L.DomUtil.create('div', 'info legend'),
+			palette = [0, 10, 50, 100, 250, 500, 750, 1000, 10000, 100000, 250000, 500000, 900000],
+			labels = [],
+			from, to;
+// iterate the palette list of color intervals and generate a label with a colored square for each interval
+		for (var i = 0; i < palette.length; i++) {
+			from = palette[i];
+			to = palette[i + 1];
+
+			labels.push(
+				'<i style="background:' + getColor(from + 1) + '"></i> ' +
+				from + (to ? '&ndash;' + to : '+'));
+		}
+
+		div.innerHTML = labels.join('<br>');
+		return div;
+	};
+
+	legend.addTo(map);
+
+</script>
+
+</body>
+</html>
